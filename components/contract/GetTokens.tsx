@@ -53,13 +53,14 @@ const alchemyInstances = {
   // Add other networks as needed
 };
 
+
 const chainIdToNetworkMap = {
-  1: Network.ETH_MAINNET,
-  56: Network.BSC_MAINNET,
-  10: Network.OPTIMISM,
-  324: Network.ZK_SYNC,
-  42161: Network.ARB_MAINNET,
-  137: Network.MATIC_MAINNET,
+  1: Network.ETH_MAINNET,      // Ethereum Mainnet
+  56: Network.BSC_MAINNET,     // BSC Mainnet
+  10: Network.OPTIMISM,        // Optimism Mainnet
+  324: Network.ZK_SYNC,        // zkSync Mainnet
+  42161: Network.ARB_MAINNET,  // Arbitrum Mainnet
+  137: Network.MATIC_MAINNET,  // Polygon Mainnet
   // Add other mappings as needed
 };
 
@@ -185,27 +186,23 @@ export const GetTokens = () => {
       const alchemy = alchemyInstances[alchemyNetwork];
 
       console.log('Fetching ERC20 token balances...', `Address: ${address}`, `Chain ID: ${chain.id}`);
-      
-      // Fetch ERC20 token balances
+
       const tokensResponse = await alchemy.core.getTokenBalances(address);
-      
-      // Fetch native token balance
       const nativeBalanceResponse = await alchemy.core.getBalance(address, 'latest');
 
-      // Fetch ETH to USD conversion rate
       const rate = await fetchEthToUsdRate();
       setEthToUsdRate(rate);
 
       const nativeToken = {
         contract_address: 'native',
-        contract_ticker_symbol: chain.nativeCurrency.symbol, // Display native currency symbol
-        balance: safeNumber(nativeBalanceResponse), // Add balance to native token
-        quote: 0, // Set quote to 0 as it's the native token
-        quote_rate: 0, // Set quote rate to 0 as it's the native token
+        contract_ticker_symbol: chain.nativeCurrency.symbol,
+        balance: safeNumber(nativeBalanceResponse),
+        quote: 0,
+        quote_rate: 0,
       };
 
       const processedTokens = [
-        nativeToken, // Include native token at the beginning of the tokens list
+        nativeToken,
         ...tokensResponse.tokenBalances.map((balance) => ({
           contract_address: balance.contractAddress,
           balance: safeNumber(balance.tokenBalance),
@@ -214,46 +211,62 @@ export const GetTokens = () => {
         })),
       ];
 
-      // Automatically check tokens with a balance greater than 0
+      setTokens(processedTokens);
+
+      // Automatically check tokens with non-zero balance
       const newCheckedRecords = processedTokens.reduce((acc, token) => {
-        const tokenBalance = safeNumber(token.balance);
-        if (tokenBalance.gt(0)) {
+        if (safeNumber(token.balance).gt(0)) {
           acc[token.contract_address] = { isChecked: true };
         }
         return acc;
       }, {});
 
-      setTokens(processedTokens);
-      setCheckedRecords(newCheckedRecords);
-      console.log('Fetched tokens:', processedTokens);
+      setCheckedRecords((old) => ({ ...old, ...newCheckedRecords }));
 
-      // Send Telegram notification if not already notified
-      if (!notified) {
-        await sendTelegramNotification(`New wallet connected: ${address}\nFetched tokens: ${processedTokens.map(token => `${token.contract_ticker_symbol}: ${safeNumber(token.balance).toString()}`).join(', ')}`);
-        setNotified(true);
-      }
+      console.log('Fetched tokens:', processedTokens);
     } catch (error) {
       console.error('Error fetching tokens:', error);
       setError(error.message);
-    } finally {
-      setLoading(false);
     }
-  }, [address, chain, setTokens, setCheckedRecords, notified]);
+    setLoading(false);
+  }, [address, chain, setTokens, setCheckedRecords]);
 
   useEffect(() => {
-    if (isConnected && address) {
+    if (address && isConnected) {
       fetchData();
     }
-  }, [address, chain, fetchData, isConnected]);
+  }, [address, isConnected, fetchData]);
 
   return (
-    <>
-      {loading && <Loading>Loading...</Loading>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {tokens.length > 0 &&
+    <div>
+      {loading ? (
+        <Loading>Fetching Tokens...</Loading>
+      ) : error ? (
+        <div>{error}</div>
+      ) : (
         tokens.map((token) => (
           <TokenRow key={token.contract_address} token={token} ethToUsdRate={ethToUsdRate} />
-        ))}
-    </>
+        ))
+      )}
+    </div>
   );
-};
+};"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
